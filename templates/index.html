@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Summary and Translation</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+        }
+        h1 {
+            text-align: center;
+            width: 100%;
+        }
+        .container {
+            display: flex;
+            width: 80%;
+            margin-top: 20px;
+        }
+        .left-side {
+            width: 30%;
+            padding-right: 20px;
+        }
+        .right-side {
+            width: 70%;
+            padding-left: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group select, .form-group textarea, .form-group input[type="url"], .form-group input[type="file"], .form-group button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .form-group button {
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            cursor: pointer;
+        }
+        .form-group button:hover {
+            background-color: #e0e0e0;
+        }
+        #text-input, #url-input, #file-input, #image-input {
+            display: none;
+        }
+        .summary-block {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <h1>Text Summary and Translation</h1>
+        <div class="container">
+            <div class="left-side">
+                <div class="form-group">
+                    <label for="choice">Choose Input Type:</label>
+                    <select name="choice" id="choice">
+                        <option value="text">Text</option>
+                        <option value="url">URL</option>
+                        <option value="document">Document</option>
+                        <option value="image">Image</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="language">Choose Language:</label>
+                    <select name="language" id="language">
+                        {% for lang, code in languages.items() %}
+                        <option value="{{ code }}" {% if code == 'en' %} selected {% endif %}>{{ lang }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <form method="POST" action="/clear_input">
+                        <button type="submit">Clear Input</button>
+                    </form>
+                </div>
+                <div class="form-group">
+                    <form method="POST" action="/clear_history">
+                        <button type="submit">Clear History</button>
+                    </form>
+                </div>
+            </div>
+            <div class="right-side">
+                <form method="POST" action="/" enctype="multipart/form-data">
+                    <div id="text-input" class="form-group">
+                        <textarea name="text" placeholder="Enter text here..."></textarea>
+                    </div>
+                    <div id="url-input" class="form-group">
+                        <input type="url" name="url" placeholder="Enter URL here...">
+                    </div>
+                    <div id="file-input" class="form-group">
+                        <input type="file" name="file">
+                    </div>
+                    <div id="image-input" class="form-group">
+                        <input type="file" name="image" accept="image/*">
+                    </div>
+                    <button type="submit">Summarize</button>
+                </form>
+                <h2>Summary</h2>
+                <div class="summary-block">{{ summary }}</div>
+                <h2>Summary History</h2>
+                {% for item in summary_history %}
+                <div class="summary-block">
+                    <p>{{ item }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var choice = document.getElementById('choice');
+            var textInput = document.getElementById('text-input');
+            var urlInput = document.getElementById('url-input');
+            var fileInput = document.getElementById('file-input');
+            var imageInput = document.getElementById('image-input');
+
+            choice.addEventListener('change', function() {
+                textInput.style.display = 'none';
+                urlInput.style.display = 'none';
+                fileInput.style.display = 'none';
+                imageInput.style.display = 'none';
+
+                if (choice.value == 'text') {
+                    textInput.style.display = 'block';
+                } else if (choice.value == 'url') {
+                    urlInput.style.display = 'block';
+                } else if (choice.value == 'document') {
+                    fileInput.style.display = 'block';
+                } else if (choice.value == 'image') {
+                    imageInput.style.display = 'block';
+                }
+            });
+
+            choice.dispatchEvent(new Event('change'));
+        });
+    </script>
+</body>
+</html>
