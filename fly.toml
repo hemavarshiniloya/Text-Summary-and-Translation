@@ -1,0 +1,14 @@
+app = "my-flask-app"
+
+[build]
+  image = "python:3.8"
+
+[env]
+  PORT = "8080"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [[services.ports]]
+    port = 80
