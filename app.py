@@ -1,16 +1,19 @@
+import nltk
+from rake_nltk import Rake
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 from textblob import TextBlob
 import pandas as pd
 from fpdf import FPDF
-from rake_nltk import Rake
-import language_tool_python
 from transformers import pipeline
 from sentence_transformers import SentenceTransformer, util
+from googletrans import Translator, LANGUAGES
 from PyPDF2 import PdfReader
 from docx import Document
-from googletrans import Translator, LANGUAGES
+
+# Download the NLTK stopwords
+nltk.download('stopwords')
 
 # Initialize models
 model = SentenceTransformer('all-MiniLM-L6-v2')
