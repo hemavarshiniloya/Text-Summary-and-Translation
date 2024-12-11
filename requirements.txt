@@ -11,5 +11,8 @@ googletrans
 deep-translator
 matplotlib
 rake-nltk
-TextBlob
-FPDF
+language_tool_python
+sentence-transformers
+PyPDF2
+python-docx
+nltk
