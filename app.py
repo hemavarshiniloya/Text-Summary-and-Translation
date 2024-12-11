@@ -12,7 +12,8 @@ from googletrans import Translator, LANGUAGES
 from PyPDF2 import PdfReader
 from docx import Document
 
-# Download the NLTK stopwords
+# Download necessary NLTK resources
+nltk.download('punkt')
 nltk.download('stopwords')
 
 # Initialize models
