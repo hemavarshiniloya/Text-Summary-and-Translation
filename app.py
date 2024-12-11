@@ -1,330 +1,340 @@
+
 import streamlit as st
 from txtai.pipeline import Summary
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from deep_translator import GoogleTranslator
 import requests
 from bs4 import BeautifulSoup
 from PyPDF2 import PdfReader
 from docx import Document
 import pandas as pd
 import xml.etree.ElementTree as ET
-import os
-import pytesseract
-from googletrans import Translator
 import re
-import torch
-from PIL import Image
-from rake_nltk import Rake
-import language_tool_python
 
 # List of languages with their ISO 639-1 codes
 languages = {
-    "English": "en", 
-    # (list truncated for brevity)
+    "English": "en",
+    "Afrikaans": "af",
+    "Albanian": "sq",
+    "Amharic": "am",
+    "Arabic": "ar",
+    "Armenian": "hy",
+    "Azerbaijani": "az",
+    "Basque": "eu",
+    "Belarusian": "be",
+    "Bengali": "bn",
+    "Bosnian": "bs",
+    "Bulgarian": "bg",
+    "Catalan": "ca",
+    "Chinese (Simplified)": "zh",
+    "Chinese (Traditional)": "zh-TW",
+    "Croatian": "hr",
+    "Czech": "cs",
+    "Danish": "da",
+    "Dutch": "nl",
+    "Esperanto": "eo",
+    "Estonian": "et",
+    "Finnish": "fi",
+    "French": "fr",
+    "Galician": "gl",
+    "Georgian": "ka",
+    "German": "de",
+    "Greek": "el",
+    "Gujarati": "gu",
+    "Haitian Creole": "ht",
+    "Hausa": "ha",
+    "Hebrew": "he",
+    "Hindi": "hi",
+    "Hungarian": "hu",
+    "Icelandic": "is",
+    "Igbo": "ig",
+    "Indonesian": "id",
+    "Irish": "ga",
+    "Italian": "it",
+    "Japanese": "ja",
+    "Javanese": "jv",
+    "Kannada": "kn",
+    "Kazakh": "kk",
+    "Khmer": "km",
+    "Kinyarwanda": "rw",
+    "Korean": "ko",
+    "Kurdish": "ku",
+    "Kyrgyz": "ky",
+    "Lao": "lo",
+    "Latvian": "lv",
+    "Lithuanian": "lt",
+    "Luxembourgish": "lb",
+    "Macedonian": "mk",
+    "Malagasy": "mg",
+    "Malay": "ms",
+    "Malayalam": "ml",
+    "Maltese": "mt",
+    "Maori": "mi",
+    "Marathi": "mr",
+    "Mongolian": "mn",
+    "Nepali": "ne",
+    "Norwegian": "no",
+    "Pashto": "ps",
+    "Persian": "fa",
+    "Polish": "pl",
+    "Portuguese": "pt",
+    "Punjabi": "pa",
+    "Romanian": "ro",
+    "Russian": "ru",
+    "Samoan": "sm",
+    "Scots Gaelic": "gd",
+    "Serbian": "sr",
+    "Sesotho": "st",
+    "Shona": "sn",
+    "Sindhi": "sd",
+    "Sinhala": "si",
+    "Slovak": "sk",
+    "Slovenian": "sl",
+    "Somali": "so",
+    "Spanish": "es",
+    "Sundanese": "su",
+    "Swahili": "sw",
+    "Swedish": "sv",
+    "Tagalog": "tl",
+    "Tajik": "tg",
+    "Tamil": "ta",
+    "Tatar": "tt",
+    "Telugu": "te",
+    "Thai": "th",
+    "Turkish": "tr",
+    "Ukrainian": "uk",
+    "Urdu": "ur",
+    "Uzbek": "uz",
+    "Vietnamese": "vi",
+    "Welsh": "cy",
+    "Xhosa": "xh",
+    "Yoruba": "yo",
+    "Zulu": "zu"
 }
-
-# Initialize tools
-summarizer = Summary()
-tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
-model = AutoModelForSequenceClassification.from_pretrained("distilbert-base-uncased")
-classifier = pipeline("text-classification", model=model, tokenizer=tokenizer)
-rake = Rake()
-tool = language_tool_python.LanguageTool('en-US')
 
 # Set page configuration
 st.set_page_config(layout="wide")
 
+# Initialize text summarizer
+def text_summary(text):
+    summary = Summary()
+    result = summary(text)
+    return result
+
 # Function to preprocess text
 def preprocess_text(text):
-    text = re.sub(r'\s+', ' ', text)
-    text = re.sub(r'[^\w\s]', '', text)
-    return text.strip()
+    text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+    text = re.sub(r'[^A-Za-z0-9\s\.]+', '', text)  # Remove unwanted characters
+    return text
 
-# Function to compute text similarity
-def compute_similarity(text1, text2):
-    vectorizer = TfidfVectorizer().fit_transform([text1, text2])
-    vectors = vectorizer.toarray()
-    return cosine_similarity([vectors[0]], [vectors[1]])[0][0]
+# Function to translate text
+def translate_text(text, target_language):
+    try:
+        translated = GoogleTranslator(source='auto', target=target_language).translate(text)
+        return translated
+    except Exception as e:
+        st.error(f"Translation error: {str(e)}")
+        return text  # Return the original text in case of an error
 
-# Function for text classification
-def classify_text(text):
-    return classifier(text)
+# Function to read PDF files
+def read_pdf(file_path):
+    pdf = PdfReader(file_path)
+    text = ''
+    for page in pdf.pages:
+        text += page.extract_text()
+    return text
 
-# Function for keyword extraction
-def extract_keywords(text):
-    rake.extract_keywords_from_text(text)
-    return rake.get_ranked_phrases()
+# Function to read Word documents
+def read_word(file_path):
+    document = Document(file_path)
+    text = ''
+    for para in document.paragraphs:
+        text += para.text
+    return text
 
-# Function for grammar and spell check
-def grammar_and_spell_check(text):
-    matches = tool.check(text)
-    return [match.message for match in matches]
+# Function to read XML files
+def read_xml(file_path):
+    tree = ET.parse(file_path)
+    root = tree.getroot()
+    text = ''
+    for elem in root:
+        text += elem.text
+    return text
 
-# Function to extract text from URL
-def extract_text_from_url(url):
+# Function to read CSV files
+def read_csv(file_path):
+    df = pd.read_csv(file_path)
+    text = ''
+    for col in df.columns:
+        text += df[col].to_string()
+    return text
+
+# Function to scrape website content
+def scrape_website(url):
     try:
         response = requests.get(url)
-        soup = BeautifulSoup(response.text, "html.parser")
-        paragraphs = soup.find_all(["p", "h1", "h2", "h3", "h4", "h5", "h6"])
-        text = "\n".join([p.get_text() for p in paragraphs])
-        return text
+        soup = BeautifulSoup(response.text, 'html.parser')
+        text = ''
+        for para in soup.find_all('p'):
+            text += para.get_text() + ' '
+        return text.strip()
     except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
-        return None
+        st.error(f"Error fetching URL: {str(e)}")
+        return ""
 
-# Function to extract text from PDF
-def extract_text_from_pdf(file):
-    reader = PdfReader(file)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text() or ""
-    return text
+# Function to store summary and translation history
+def store_summary_and_translation(original, summary, translated):
+    if "history" not in st.session_state:
+        st.session_state.history = []
+    st.session_state.history.append({
+        "Original Text": original,
+        "Summary": summary,
+        "Translated Summary": translated
+    })
 
-# Function to extract text from DOCX
-def extract_text_from_docx(file):
-    doc = Document(file)
-    text = "\n".join([para.text for para in doc.paragraphs])
-    return text
-
-# Function to extract text from TXT
-def extract_text_from_txt(file):
-    return file.read().decode("utf-8")
-
-# Function to extract text from HTML
-def extract_text_from_html(file):
-    soup = BeautifulSoup(file.read(), "html.parser")
-    paragraphs = soup.find_all(["p", "h1", "h2", "h3", "h4", "h5", "h6"])
-    text = "\n".join([p.get_text() for p in paragraphs])
-    return text
-
-# Function to extract text from CSV
-def extract_text_from_csv(file):
-    df = pd.read_csv(file)
-    return df.to_string()
-
-# Function to extract text from XML
-def extract_text_from_xml(file):
-    tree = ET.parse(file)
-    root = tree.getroot()
-    text = " ".join([elem.text for elem in root.iter() if elem.text])
-    return text
-
-# Function to extract text from Image
-def extract_text_from_image(file):
-    image = Image.open(file)
-    text = pytesseract.image_to_string(image)
-    return text
-
-# Function to save summary to history
-def save_summary(summary):
-    filename = "summary_history.txt"
-    with open(filename, "a", encoding="utf-8") as f:
-        f.write(summary + "\n\n")
-
-# Function to load summary history
-def load_summary_history():
-    filename = "summary_history.txt"
-    if os.path.exists(filename):
-        try:
-            with open(filename, "r", encoding="utf-8") as f:
-                return f.read()
-        except UnicodeDecodeError:
-            with open(filename, "r", encoding="latin1") as f:
-                return f.read()
-    return ""
-
-# Function to clear summary history
-def clear_summary_history():
-    filename = "summary_history.txt"
-    if os.path.exists(filename):
-        os.remove(filename)
-
-# Function to clear input fields based on choice
-def clear_input(choice):
-    if choice == "Summarize Text":
-        st.session_state.text = ""
-    elif choice == "Summarize URL":
-        st.session_state.url = ""
-    elif choice == "Summarize Document":
-        st.session_state.uploaded_files = []
-    elif choice == "Summarize Text from Clipboard":
-        st.session_state.clipboard_text = ""
-
-# Function to validate input
-def validate_input(text):
-    return bool(text and text.strip())
-
-# Function to translate text using Google Translate API
-def translate_text(text, target_language):
-    translator = Translator()
-    translated = translator.translate(text, dest=target_language)
-    return translated.text
-
-# Function to download file
-def download_file(content, filename):
-    st.download_button(label="Download Summary", data=content, file_name=filename, mime="text/plain")
-
-# Main function to run the Streamlit app
+# Main function
 def main():
-    st.title("Text Analysis App")
+    st.title("📝 Text Summarization and Translation App")
+    st.write("This app can summarize text and translate it to various languages.")
 
-    # Language selection
-    selected_language = st.sidebar.selectbox("Select Language", options=list(languages.keys()), index=0)
+    # Language selection in sidebar
+    selected_language = st.sidebar.selectbox("🌐 Select a language to translate to", list(languages.keys()), index=0)
 
-    # Handle choice selection
-    choice = st.sidebar.radio("Choose an option", [
-        "Summarize Text", "Summarize URL", "Summarize Document", 
-        "Summarize Text from Clipboard", "Compare Text Similarity",
-        "Classify Text", "Extract Keywords", "Check Grammar and Spelling"
-    ])
+    # Input selection
+    input_type = st.selectbox("📂 Select input type", ["Text", "File", "URL"], index=0)
 
-    # Initialize session state attributes if they don't exist
-    if 'text' not in st.session_state:
-        st.session_state.text = ""
-    if 'url' not in st.session_state:
-        st.session_state.url = ""
-    if 'uploaded_files' not in st.session_state:
-        st.session_state.uploaded_files = []
-    if 'clipboard_text' not in st.session_state:
-        st.session_state.clipboard_text = ""
+    if input_type == "Text":
+        # Text input
+        text_input = st.text_area("✏️ Enter text to summarize and translate", height=200)
 
-    # Handle each choice
-    if choice == "Summarize Text":
-        st.session_state.text = st.text_area("Enter Text", st.session_state.text)
-        maxlength = st.slider("Maximum Summary Length", min_value=50, max_value=1000, value=200)
-
-        if st.button("Summarize"):
-            if validate_input(st.session_state.text):
+        # Summarize and translate button
+        if st.button("✨ Summarize and Translate"):
+            if text_input:
                 with st.spinner("Processing..."):
-                    text = preprocess_text(st.session_state.text)
-                    summary = summarizer(text, maxlength)
+                    # Preprocess text
+                    text = preprocess_text(text_input)
+
+                    # Summarize text
+                    summary = text_summary(text)
+
+                    # Translate summary
                     translated_summary = translate_text(summary, languages[selected_language])
-                    
-                    st.write("### Summary")
+
+                    # Store history
+                    store_summary_and_translation(text, summary, translated_summary)
+
+                    # Display results
+                    st.write("📝 Original Text:")
+                    st.write(text_input)
+                    st.write("📄 Summary:")
+                    st.write(summary)
+                    st.write("🌍 Translated Summary:")
                     st.write(translated_summary)
 
-                    save_summary(translated_summary)
-                    download_file(translated_summary, "summary.txt")
+                    # Save results
+                    st.write("💾 Save Results:")
+                    save_button = st.button("Save as Text File")
+                    if save_button:
+                        with open("results.txt", "w") as f:
+                            f.write("Original Text:\n" + text_input + "\n\nSummary:\n" + summary + "\n\nTranslated Summary:\n" + translated_summary)
+                        st.write("Results saved to results.txt")
 
-    elif choice == "Summarize URL":
-        st.session_state.url = st.text_input("Enter URL", st.session_state.url)
+                    # Clear input
+                    clear_button = st.button("🧹 Clear Input")
+                    if clear_button:
+                        st.session_state.clear()
 
-        if st.button("Summarize URL"):
-            if validate_input(st.session_state.url):
+    elif input_type == "File":
+        # File uploader
+        file_uploaded = st.file_uploader("📥 Upload a file (PDF, Word, XML, CSV)", type=["pdf", "docx", "xml", "csv"], accept_multiple_files=False)
+
+        # Summarize and translate button
+        if st.button("✨ Summarize and Translate"):
+            if file_uploaded:
                 with st.spinner("Processing..."):
-                    text = extract_text_from_url(st.session_state.url)
-                    summary = summarizer(text)
+                    if file_uploaded.name.endswith('.pdf'):
+                        text = read_pdf(file_uploaded)
+                    elif file_uploaded.name.endswith('.docx'):
+                        text = read_word(file_uploaded)
+                    elif file_uploaded.name.endswith('.xml'):
+                        text = read_xml(file_uploaded)
+                    elif file_uploaded.name.endswith('.csv'):
+                        text = read_csv(file_uploaded)
+
+                    # Preprocess text
+                    text = preprocess_text(text)
+
+                    # Summarize text
+                    summary = text_summary(text)
+
+                    # Translate summary
                     translated_summary = translate_text(summary, languages[selected_language])
-                    
-                    st.write("### Summary")
+
+                    # Store history
+                    store_summary_and_translation(text, summary, translated_summary)
+
+                    # Display results
+                    st.write("📝 Original Text:")
+                    st.write(text)
+                    st.write("📄 Summary:")
+                    st.write(summary)
+                    st.write("🌍 Translated Summary:")
                     st.write(translated_summary)
 
-                    save_summary(translated_summary)
-                    download_file(translated_summary, "summary.txt")
+                    # Clear input
+                    clear_button = st.button("🧹 Clear Input")
+                    if clear_button:
+                        st.session_state.clear()
 
-    elif choice == "Summarize Document":
-        uploaded_files = st.file_uploader("Choose a file", accept_multiple_files=True)
-        st.session_state.uploaded_files = uploaded_files
+    elif input_type == "URL":
+        # URL input
+        url_input = st.text_input("🔗 Enter a URL")
 
-        if st.button("Summarize Document"):
-            if uploaded_files:
+        # Summarize and translate button
+        if st.button("✨ Summarize and Translate"):
+            if url_input:
                 with st.spinner("Processing..."):
-                    text = ""
-                    for uploaded_file in uploaded_files:
-                        if uploaded_file.type == "application/pdf":
-                            text += extract_text_from_pdf(uploaded_file)
-                        elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-                            text += extract_text_from_docx(uploaded_file)
-                        elif uploaded_file.type == "text/plain":
-                            text += extract_text_from_txt(uploaded_file)
-                        elif uploaded_file.type == "text/html":
-                            text += extract_text_from_html(uploaded_file)
-                        elif uploaded_file.type == "text/csv":
-                            text += extract_text_from_csv(uploaded_file)
-                        elif uploaded_file.type == "application/xml":
-                            text += extract_text_from_xml(uploaded_file)
-                        elif uploaded_file.type.startswith("image/"):
-                            text += extract_text_from_image(uploaded_file)
-                    
-                    summary = summarizer(text)
+                    # Scrape website content
+                    text = scrape_website(url_input)
+
+                    # Preprocess text
+                    text = preprocess_text(text)
+
+                    # Summarize text
+                    summary = text_summary(text)
+
+                    # Translate summary
                     translated_summary = translate_text(summary, languages[selected_language])
-                    
-                    st.write("### Summary")
+
+                    # Store history
+                    store_summary_and_translation(text, summary, translated_summary)
+
+                    # Display results
+                    st.write("📝 Original Text:")
+                    st.write(text)
+                    st.write("📄 Summary:")
+                    st.write(summary)
+                    st.write("🌍 Translated Summary:")
                     st.write(translated_summary)
 
-                    save_summary(translated_summary)
-                    download_file(translated_summary, "summary.txt")
+                    # Clear input
+                    clear_button = st.button("🧹 Clear Input")
+                    if clear_button:
+                        st.session_state.clear()
 
-    elif choice == "Summarize Text from Clipboard":
-        st.session_state.clipboard_text = st.text_area("Paste Text from Clipboard", st.session_state.clipboard_text)
+    # Show summary and translation history
+    if "history" in st.session_state:
+        st.write("📜 Previous Summaries and Translations:")
+        for entry in st.session_state.history:
+            st.write(f"**Original:** {entry['Original Text']}")
+            st.write(f"**Summary:** {entry['Summary']}")
+            st.write(f"**Translated Summary:** {entry['Translated Summary']}")
+            st.write("---")
 
-        if st.button("Summarize Clipboard Text"):
-            if validate_input(st.session_state.clipboard_text):
-                with st.spinner("Processing..."):
-                    text = preprocess_text(st.session_state.clipboard_text)
-                    summary = summarizer(text)
-                    translated_summary = translate_text(summary, languages[selected_language])
-                    
-                    st.write("### Summary")
-                    st.write(translated_summary)
-
-                    save_summary(translated_summary)
-                    download_file(translated_summary, "summary.txt")
-
-    elif choice == "Compare Text Similarity":
-        text1 = st.text_area("Enter First Text")
-        text2 = st.text_area("Enter Second Text")
-
-        if st.button("Compare Similarity"):
-            if validate_input(text1) and validate_input(text2):
-                with st.spinner("Processing..."):
-                    similarity = compute_similarity(text1, text2)
-                    st.write(f"### Similarity Score: {similarity:.4f}")
-
-    elif choice == "Classify Text":
-        text = st.text_area("Enter Text for Classification")
-
-        if st.button("Classify Text"):
-            if validate_input(text):
-                with st.spinner("Processing..."):
-                    result = classify_text(text)
-                    st.write("### Classification Result")
-                    st.write(result)
-
-    elif choice == "Extract Keywords":
-        text = st.text_area("Enter Text for Keyword Extraction")
-
-        if st.button("Extract Keywords"):
-            if validate_input(text):
-                with st.spinner("Processing..."):
-                    keywords = extract_keywords(text)
-                    st.write("### Keywords")
-                    st.write(", ".join(keywords))
-
-    elif choice == "Check Grammar and Spelling":
-        text = st.text_area("Enter Text for Grammar and Spell Check")
-
-        if st.button("Check Text"):
-            if validate_input(text):
-                with st.spinner("Processing..."):
-                    issues = grammar_and_spell_check(text)
-                    st.write("### Grammar and Spelling Issues")
-                    st.write("\n".join(issues))
-
-    if st.sidebar.button("Clear Input"):
-        clear_input(choice)
-
-    if st.sidebar.button("Clear Summary History"):
-        clear_summary_history()
-
-    if st.sidebar.button("Load Summary History"):
-        history = load_summary_history()
-        if history:
-            st.write("### Summary History")
-            st.write(history)
-        else:
-            st.write("No summary history found.")
+        # Clear history button
+        clear_history_button = st.button("🗑️ Clear History")
+        if clear_history_button:
+            st.session_state.history.clear()  # Clear the history
+            st.success("History cleared successfully.")
 
 if __name__ == "__main__":
     main()
