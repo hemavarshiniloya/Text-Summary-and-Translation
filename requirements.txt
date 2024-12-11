@@ -11,3 +11,4 @@ googletrans
 deep-translator
 matplotlib
 rake-nltk
+TextBlob
