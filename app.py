@@ -11,6 +11,7 @@ from sentence_transformers import SentenceTransformer, util
 from googletrans import Translator, LANGUAGES
 from PyPDF2 import PdfReader
 from docx import Document
+import language_tool_python
 
 # Download necessary NLTK resources
 nltk.download('punkt')
@@ -110,6 +111,17 @@ def extract_text_from_file(file):
     
     return ""  # Return empty string if file type is not supported
 
+# Scrape website to extract text
+def scrape_website(url):
+    try:
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        paragraphs = soup.find_all('p')
+        text = " ".join([para.text for para in paragraphs])
+        return text
+    except Exception as e:
+        return f"Error scraping the website: {e}"
+
 # Streamlit app interface
 def main():
     st.title("📝 Enhanced Text Summarization and Translation App")
@@ -168,7 +180,7 @@ def main():
             if url_input:
                 with st.spinner("Processing..."):
                     # Scrape and summarize
-                    text = scrape_website(url_input)  # Define the function to scrape the website
+                    text = scrape_website(url_input)
                     summary = text_summary(text)
                     metadata = extract_metadata(url_input)
 
