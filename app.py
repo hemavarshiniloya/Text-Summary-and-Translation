@@ -15,6 +15,7 @@ import language_tool_python
 
 # Download necessary NLTK resources
 nltk.download('punkt')
+nltk.download('punkt_tab')  # This downloads the missing punkt_tab resource
 nltk.download('stopwords')
 
 # Initialize models
