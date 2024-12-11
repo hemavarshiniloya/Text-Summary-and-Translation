@@ -12,3 +12,4 @@ deep-translator
 matplotlib
 rake-nltk
 TextBlob
+FPDF
