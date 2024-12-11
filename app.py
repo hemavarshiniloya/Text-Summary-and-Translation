@@ -8,6 +8,9 @@ from rake_nltk import Rake
 import language_tool_python
 from transformers import pipeline
 from sentence_transformers import SentenceTransformer, util
+from PyPDF2 import PdfReader
+from docx import Document
+from googletrans import Translator, LANGUAGES
 
 # Initialize models
 model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -77,12 +80,40 @@ def save_as_pdf(results):
         pdf.cell(200, 10, txt=f"{key}: {value}", ln=True)
     pdf.output("summary_results.pdf")
 
+# Translate text to selected language
+def translate_text(text, target_language="en"):
+    translator = Translator()
+    return translator.translate(text, dest=target_language).text
+
+# Function to extract text from files (PDF, DOCX, TXT)
+def extract_text_from_file(file):
+    if file.type == "text/plain":
+        return file.getvalue().decode("utf-8")
+    
+    elif file.type == "application/pdf":
+        reader = PdfReader(file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text()
+        return text
+    
+    elif file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        doc = Document(file)
+        text = ""
+        for para in doc.paragraphs:
+            text += para.text + "\n"
+        return text
+    
+    return ""  # Return empty string if file type is not supported
+
 # Streamlit app interface
 def main():
     st.title("📝 Enhanced Text Summarization and Translation App")
 
-    # Language selection (Placeholder for translation)
-    selected_language = st.sidebar.selectbox("🌐 Select language", ["English", "Telugu"], index=0)
+    # Language selection (All available languages)
+    language_list = list(LANGUAGES.keys())  # List of all available language codes
+    selected_language_code = st.sidebar.selectbox("🌐 Select language", language_list, index=0)
+    selected_language_name = LANGUAGES[selected_language_code]  # Get the language name
 
     # Input selection
     input_type = st.selectbox("📂 Select input type", ["Text", "File", "URL"], index=0)
@@ -108,6 +139,18 @@ def main():
                     st.write("🔑 Keywords: ", keywords)
                     st.write("🔍 Grammar Issues: ", grammar_issues)
 
+                    # Translate if not in English
+                    if selected_language_code != "en":
+                        summary = translate_text(summary, target_language=selected_language_code)
+                        # Apply translation to other results as needed
+                        classification = translate_text(str(classification), target_language=selected_language_code)
+                        sentiment = translate_text(str(sentiment), target_language=selected_language_code)
+
+                    # Display translated results
+                    st.write(f"🗣️ Translated Summary in {selected_language_name}: ", summary)
+                    st.write(f"🗣️ Translated Classification in {selected_language_name}: ", classification)
+                    st.write(f"🗣️ Translated Sentiment in {selected_language_name}: ", sentiment)
+
                     # Save results
                     save_button = st.button("Save Results")
                     if save_button:
@@ -121,7 +164,7 @@ def main():
             if url_input:
                 with st.spinner("Processing..."):
                     # Scrape and summarize
-                    text = scrape_website(url_input)
+                    text = scrape_website(url_input)  # Define the function to scrape the website
                     summary = text_summary(text)
                     metadata = extract_metadata(url_input)
 
@@ -134,7 +177,7 @@ def main():
 
         if file_input is not None:
             # Handle text extraction from file
-            text = extract_text_from_file(file_input)  # Define the text extraction function
+            text = extract_text_from_file(file_input)
             summary = text_summary(text)
             st.write("📄 File Summary: ", summary)
 
